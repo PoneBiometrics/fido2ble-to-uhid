@@ -33,6 +33,11 @@ class CTAPHID_CMD(enum.IntEnum):
     WINK = 0x08
     LOCK = 0x04
 
+class CTAPHID_CAPABILITIES(enum.IntFlag):
+    CAPABILITY_WINK = 0x01  # not defined for BLE
+    CAPABILITY_CBOR = 0x04  # 
+    CAPABILITY_NMSG = 0x08  # PONE OffPAD currently only supports FIDO2, not U2F, so this will be set for now
+                            # TODO: check if we can get that info from the device itself
 
 class CTAPBLE_CMD(enum.IntEnum):
     PING = 0x81
@@ -162,11 +167,11 @@ class CTAPBLEDeviceConnection:
                 ">8sIBBBBB",
                 nonce,
                 self.channel,
-                2,  # protocol version
-                0,  # device version major
-                1,  # device version minor
-                1,  # device version build/point
-                0x08 | 0x04,  # capabilities TODO: get them from the device instead
+                2,  # protocol version, currently fixed at 2
+                0,  # device version major, TODO get from devie
+                1,  # device version minor, TODO get from device
+                1,  # device version build/point, TODO get from device
+                CTAPHID_CAPABILITIES.CAPABILITY_CBOR | CTAPHID_CAPABILITIES.CAPABILITY_NMSG, # these are the same for all BLE FIDO2 devices
             ),
             channel=CTAPHID_BROADCAST_CHANNEL,
         )
@@ -200,6 +205,13 @@ class CTAPBLEDeviceConnection:
             await self.send_hid_message(CTAPHID_CMD.CBOR, self.ble_buffer)
         elif self.ble_command == CTAPBLE_CMD.KEEPALIVE:
             await self.send_hid_message(CTAPHID_CMD.KEEPALIVE, self.ble_buffer)
+        elif self.ble_command == CTAPBLE_CMD.ERROR:
+            await self.send_hid_message(CTAPHID_CMD.ERROR, self.ble_buffer)
+        elif self.ble_command == CTAPBLE_CMD.PING:
+            await self.send_hid_message(CTAPHID_CMD.PING, self.ble_buffer)
+        elif self.ble_command == CTAPBLE_CMD.CANCEL:
+            # not sure if this case can happen, as the cancel command comes from the relying party, not from the FIDO device
+            await self.send_hid_message(CTAPHID_CMD.CANCEL, self.ble_buffer)
         else:
             pass
         self.ble_command = CTAPBLE_CMD.CANCEL
@@ -273,6 +285,16 @@ class CTAPBLEDeviceConnection:
         logging.info(f"hid rx: command={self.hid_command.name} payload={self.hid_buffer.hex()}")
         if self.hid_command == CTAPHID_CMD.CBOR:
             await self.send_ble_message(CTAPBLE_CMD.MSG, self.hid_buffer)
+        elif self.hid_command == CTAPHID_CMD.CANCEL:
+            await self.send_ble_message(CTAPBLE_CMD.CANCEL, self.hid_buffer)
+        elif self.hid_command == CTAPHID_CMD.ERROR:
+            # this should not happen, as the error is sent from the fido2 device via BLE, not from the relying party.
+            await self.send_ble_message(CTAPBLE_CMD.ERROR, self.hid_buffer)
+        elif self.hid_command == CTAPHID_CMD.PING:
+            await self.send_ble_message(CTAPBLE_CMD.PING, self.hid_buffer)
+        elif self.hid_command in (CTAPHID_CMD.INIT, CTAPHID_CMD.WINK, CTAPHID_CMD.MSG, CTAPHID_CMD.LOCK):
+            # TODO
+            pass
 
     async def close(self):
         await self.ble_client.disconnect()
@@ -373,7 +395,8 @@ class CTAPHIDDevice:
 
     async def handle_init(self, channel, buffer: bytes):  # async?
         if channel == CTAPHID_BROADCAST_CHANNEL and len(buffer) == 8:
-            new_channel = randint(0, CTAPHID_BROADCAST_CHANNEL - 1)
+            # https://fidoalliance.org/specs/fido-v2.1-rd-20210309/fido-client-to-authenticator-protocol-v2.1-rd-20210309.html#usb-channels
+            new_channel = randint(1, CTAPHID_BROADCAST_CHANNEL - 1)
 
             logging.info("scanning for BLE devices now")
             ble_device = await self.scan_for_fido2ble()
