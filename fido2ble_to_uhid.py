@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3.11
 
 import asyncio
 import enum
@@ -12,6 +12,23 @@ from bleak import BleakClient, BleakScanner
 from bleak.backends.device import BLEDevice
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.scanner import AdvertisementData
+
+
+###################
+import os
+import sys
+
+sys.path.append(os.path.abspath(os.path.dirname(__file__) + "/.."))
+
+import asyncio
+import json
+
+from dbus_fast import BusType, Message, MessageType
+from dbus_fast.aio import MessageBus
+######################
+
+
+
 
 FIDO_SERVICE_UUID = "0000fffd-0000-1000-8000-00805f9b34fb"
 FIDO_CONTROL_POINT_UUID = "f1d0fff1-deaa-ecee-b42f-c9ba7ed623bb"
@@ -92,8 +109,8 @@ logging.getLogger("UHIDDevice").setLevel(logging.ERROR)
 
 
 class CTAPBLEDeviceConnection:
-    ble_client: BleakClient = None
-    fidoControlPoint: BleakGATTCharacteristic = None
+    ble_client: BleakClient = None  #Bleak
+    fidoControlPoint: BleakGATTCharacteristic = None #Bleak
     fidoControlPointLength: int = 0
     ble_command: CTAPBLE_CMD = CTAPBLE_CMD.CANCEL
     ble_buffer: bytes = b""
@@ -120,7 +137,7 @@ class CTAPBLEDeviceConnection:
     async def connect_to_ble(self, device):
         # do the general setup
 
-        client = BleakClient(device)
+        client = BleakClient(device)  #Bleak
         await client.connect()
         # https://fidoalliance.org/specs/fido-v2.0-id-20180227/fido-client-to-authenticator-protocol-v2.0-id-20180227.html#ble-protocol-overview
 
@@ -411,7 +428,7 @@ class CTAPHIDDevice:
 
     async def scan_for_fido2ble(self):
         stop_event = asyncio.Event()
-        found_devices: List[BLEDevice] = []
+        found_devices: List[BLEDevice] = []    #Bleak
 
         def callback(device: BLEDevice, advertising_data: AdvertisementData):
             if FIDO_SERVICE_UUID in advertising_data.service_uuids:
@@ -435,9 +452,66 @@ async def run_device() -> None:
     device = CTAPHIDDevice()
     await device.start()
 
+##########
+async def list_paired_devices():
+    # Connect to the D-Bus system bus
+    bus = await MessageBus(bus_type= BusType.SYSTEM).connect()
 
+
+    #introspection = await bus.introspect('org.bluez', '/org/bluez')
+    #obj = bus.get_proxy_object('org.mpris.MediaPlayer2.vlc', '/org/mpris/MediaPlayer2', introspection)
+    #player = obj.get_interface('org.mpris.MediaPlayer2.Player')
+    #properties = obj.get_interface('org.freedesktop.DBus.Properties')
+
+    # introspection = await bus.introspect(
+    #     "org.freedesktop.DBus", "/org/freedesktop/DBus"
+    # )
+    introspection = await bus.introspect(
+         "org.bluez", "/org/bluez"
+    )
+
+    # Get the BlueZ adapter object
+    adapter_object =  bus.get_proxy_object(
+        'org.freedesktop.DBus',
+        '/org/freedesktop/DBus',  # Replace with the correct adapter path for your system
+        introspection
+    )
+
+    reply = await bus.call(
+        Message(
+            destination="org.bluez",
+            path="/",
+            interface="org.freedesktop.DBus.ObjectManager",
+            member="GetManagedObjects",
+        )
+    )
+    if reply.message_type == MessageType.ERROR:
+        raise Exception(reply.body[0])
+    
+    else : 
+        for path in reply :  #TODO: Needs a member of the reply here, original code from https://github.com/pauloborges/bluez/blob/master/test/get-managed-objects 
+            #was reply.keys, but it didnt have that property
+            print("[ %s ]" % (path))
+
+            interfaces = reply[path]
+
+            for interface in interfaces.keys():
+                if interface in ["org.freedesktop.DBus.Introspectable",
+                        "org.freedesktop.DBus.Properties"]:
+                    continue
+
+                print("    %s" % (interface))
+
+                properties = interfaces[interface]
+
+                for key in properties.keys():
+                    print("      %s = %s" % (key, properties[key]))
+##########
+    
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     loop = asyncio.get_event_loop()
+    asyncio.run(list_paired_devices())
+
     loop.run_until_complete(run_device())  # create device
     loop.run_forever()  # run queued dispatch tasks
