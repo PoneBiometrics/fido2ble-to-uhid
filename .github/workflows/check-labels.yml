@@ -35,6 +35,6 @@ jobs:
         with:
           mode: exactly
           count: 1
-          labels: "feature, bug, documentation"
+          labels: "feature, bug, documentation, workflow"
           add_comment: true
           message: "One and only one of those labels are mandatory {{ provided }}."
