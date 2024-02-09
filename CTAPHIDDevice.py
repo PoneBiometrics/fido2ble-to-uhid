@@ -15,7 +15,7 @@ CTAPHID_BROADCAST_CHANNEL = 0xFFFFFFFF
 class CTAPHIDDevice:
     device: uhid.UHIDDevice
     ble_device: CTAPBLEDevice
-    channels_to_state: dict[int, CTAPBLEDevice] = {}
+    channels_to_state: dict[int, CTAPBLEDeviceConnection] = {}
 
     hid_packet_size: int = 64
     channel: int = 0
@@ -29,6 +29,8 @@ class CTAPHIDDevice:
     ble_buffer: bytes = b""
     ble_total_length = 0
     ble_seq = -1
+
+    nonce = 0
 
     reference_count = 0
     """Number of open handles to the device: clear state when it hits zero."""
@@ -103,12 +105,15 @@ class CTAPHIDDevice:
             '''
 
     async def handle_init(self, channel, buffer: bytes):  # async?
+        logging.info(f"hid init: channel={'%X' % channel} buffer={buffer}")
         if channel == CTAPHID_BROADCAST_CHANNEL and len(buffer) == 8:
+            logging.info("Broadcast")
             # https://fidoalliance.org/specs/fido-v2.1-rd-20210309/fido-client-to-authenticator-protocol-v2.1-rd-20210309.html#usb-channels
             new_channel = randint(1, CTAPHID_BROADCAST_CHANNEL - 1)
             self.channel = new_channel
+            self.nonce = buffer
 
-            await self.send_init_reply(buffer)
+            await self.send_init_reply(buffer, CTAPHID_BROADCAST_CHANNEL)
 
             logging.info("scanning for BLE devices now")
 
@@ -118,10 +123,19 @@ class CTAPHIDDevice:
                 return None
 
             self.channels_to_state[new_channel] = await CTAPBLEDeviceConnection.create(
-                self, ble_device, new_channel, buffer
+                self.handle_ble_message, ble_device, new_channel
             )
+        elif buffer == self.nonce:
+            logging.info("Reuse")
+            await self.send_init_reply(buffer, self.channel)
+            ble_device = self.ble_device
 
-    async def send_init_reply(self, nonce: bytes):
+            if ble_device is None:
+                return None
+
+            await self.channels_to_state[self.channel].reconnect(self.handle_ble_message)
+
+    async def send_init_reply(self, nonce: bytes, channel: int):
         await self.send_hid_message(
             CTAPHID_CMD.INIT,
             struct.pack(
@@ -134,11 +148,11 @@ class CTAPHIDDevice:
                 1,  # device version build/point, TODO get from device
                 CTAPHID_CAPABILITIES.CAPABILITY_CBOR | CTAPHID_CAPABILITIES.CAPABILITY_NMSG, # these are the same for all BLE FIDO2 devices
             ),
-            channel=CTAPHID_BROADCAST_CHANNEL,
+            channel=channel
         )
         pass
 
-    async def send_hid_message(self, command:CTAPHID_CMD, payload: bytes, channel: int = None):
+    async def send_hid_message(self, command: CTAPHID_CMD, payload: bytes, channel: int = None):
         logging.info(f"hid tx: command={command.name} payload={payload.hex()}")
         if channel is None:
             channel = self.channel
@@ -155,6 +169,7 @@ class CTAPHIDDevice:
 
             response += b"\0" * (self.hid_packet_size - len(response))
 
+            logging.info("SENDING")
             self.device.send_input(response)
 
             offset_start += capacity
@@ -240,6 +255,7 @@ class CTAPHIDDevice:
 
     async def ble_finish_receiving(self):
         logging.info(f"ble rx: command={self.ble_command.name} payload={self.ble_buffer.hex()}")
+        self.channels_to_state[self.channel].keep_alive()
         if self.ble_command == CTAPBLE_CMD.MSG:
             await self.send_hid_message(CTAPHID_CMD.CBOR, self.ble_buffer)
         elif self.ble_command == CTAPBLE_CMD.KEEPALIVE:

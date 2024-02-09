@@ -36,7 +36,6 @@ class CTAPBLE_ERROR(enum.IntEnum):
     OTHER = 0x7F
 
 
-
 def notify_message(handler, interface_name, changed_properties, invalidated_properties):
     # Add check here for message length and read until done then close connection
     # Should bind this with USB as well as just direct translate.
@@ -105,7 +104,8 @@ class CTAPBLEDevice:
         await self.fido_status.call_start_notify()
         logging.info("Notify active")
 
-    async def disconnect(self):
+    async def disconnect(self, handler):
+        self.fido_status_notify_listen.off_properties_changed(partial(notify_message, handler))
         await self.fido_status.call_stop_notify()
         await self.device.call_disconnect()
         self.connected = False

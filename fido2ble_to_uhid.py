@@ -16,6 +16,7 @@ FIDO_STATUS_UUID = "f1d0fff2-deaa-ecee-b42f-c9ba7ed623bb"
 FIDO_CONTROL_POINT_LENGTH_UUID = "f1d0fff3-deaa-ecee-b42f-c9ba7ed623bb"
 FIDO_SERVICE_REVISION_BITFIELD_UUID = "f1d0fff4-deaa-ecee-b42f-c9ba7ed623bb"
 
+
 class CTAP_STATUS(enum.IntEnum):
     """Status codes
 
@@ -36,6 +37,7 @@ class CTAP_STATUS(enum.IntEnum):
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("UHIDDevice").setLevel(logging.ERROR)
+
 
 async def find_fido() -> dict[str, CTAPBLEDevice]:
     bus: MessageBus = await MessageBus(bus_type=BusType.SYSTEM).connect()
@@ -71,7 +73,10 @@ async def start_system():
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(start_system())
-    logging.info("FOREVER NOW")
-    loop.run_forever()  # run queued dispatch tasks
-    loop.close()
+    try:
+        loop.run_until_complete(start_system())
+        logging.info("FOREVER NOW")
+        loop.run_forever()  # run queued dispatch tasks
+        loop.close()
+    except KeyboardInterrupt:
+        loop.close()
