@@ -1,39 +1,9 @@
 #!/usr/bin/env python
 import asyncio
-import enum
 import logging
 from functools import partial
 from dbus_fast import BusType
 from dbus_fast.aio import ProxyInterface, MessageBus
-
-class CTAPBLE_CMD(enum.IntEnum):
-    PING = 0x81
-    KEEPALIVE = 0x82
-    MSG = 0x83
-    CANCEL = 0xBE
-    ERROR = 0xBF
-
-
-class CTAPBLE_KEEPALIVE(enum.IntEnum):
-    PROCESSING = 0x01
-    UP_NEEDED = 0x02
-
-
-class CTAPBLE_ERROR(enum.IntEnum):
-    """ERROR constants and values for BLE.
-
-    See: https://fidoalliance.org/specs/fido-v2.1-rd-20210309/fido-client-to-authenticator-protocol-v2.1-rd-20210309.html#ble-constants
-    """
-
-    INVALID_CMD = 0x01
-    INVALID_PAR = 0x02
-    INVALID_LEN = 0x03
-    INVALID_SEQ = 0x04
-    REQ_TIMEOUT = 0x05
-    BUSY = 0x06
-    LOCK_REQUIRED = 0x0A  # only relevant in HID
-    INVALID_CHANNEL = 0x0B  # only relevant in HID
-    OTHER = 0x7F
 
 
 def notify_message(handler, interface_name, changed_properties, invalidated_properties):
@@ -53,6 +23,7 @@ class CTAPBLEDevice:
     fido_status: ProxyInterface  # org.bluez.GattCharacteristic1
     fido_status_notify_listen: ProxyInterface  # org.freedesktop.DBus.Properties
     max_msg_size: int
+    handler = None
 
     def __init__(self, device: ProxyInterface, device_id: str):
         self.device = device
@@ -60,10 +31,12 @@ class CTAPBLEDevice:
         self.max_msg_size = 0
 
     async def connect(self, handler):
-        if not self.connected:
+        if self.max_msg_size == 0: # If we know Max Msg we have done this at least once. Don't want to redo it
+            self.handler = partial(notify_message, handler)
             logging.info("START CONNECT")
             bus: MessageBus = await MessageBus(bus_type=BusType.SYSTEM).connect()
             # Must connect at least once to be able to get all the characteristics
+            # We might need to refresh through managed objects. This throws error first time on boot
             await self.device.call_connect()
             logging.info("connected")
             # Hard code char ids or adaptive?
@@ -84,7 +57,23 @@ class CTAPBLEDevice:
             self.fido_status = status_characteristic
             self.fido_status_notify_listen = notify_properties
             self.connected = True
-            await self.listen_to_notify(handler)
+            await self.listen_to_notify()
+        else:
+            logging.info(f"Device already connected: {self.device_id}")
+            await self.reconnect()
+
+        return self
+
+    async def reconnect(self):
+        await self.device.call_connect()
+        self.connected = True
+        await self.listen_to_notify()
+
+    async def disconnect(self):
+        self.fido_status_notify_listen.off_properties_changed(self.handler)
+        await self.fido_status.call_stop_notify()
+        await self.device.call_disconnect()
+        self.connected = False
 
     async def write_data(self, payload):
         logging.info("Starting write data")
@@ -95,17 +84,9 @@ class CTAPBLEDevice:
         logging.info("Connection complete")
         await self.fido_control_point.call_write_value(payload, {})
 
-    async def listen_to_notify(self, handler):
-        # self.fido_status_notify_listen.on_properties_changed(partial(notify_message, self.fido_status))
+    async def listen_to_notify(self):
         logging.info("Setting up listener")
-        # await self.fido_status.call_stop_notify()
-        self.fido_status_notify_listen.on_properties_changed(partial(notify_message, handler))
+        self.fido_status_notify_listen.on_properties_changed(self.handler)
         logging.info("Listener ready")
         await self.fido_status.call_start_notify()
         logging.info("Notify active")
-
-    async def disconnect(self, handler):
-        self.fido_status_notify_listen.off_properties_changed(partial(notify_message, handler))
-        await self.fido_status.call_stop_notify()
-        await self.device.call_disconnect()
-        self.connected = False

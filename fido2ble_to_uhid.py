@@ -65,17 +65,15 @@ async def find_fido() -> dict[str, CTAPBLEDevice]:
 
 async def start_system():
     fido_devices: dict[str, CTAPBLEDevice] = await find_fido()
-    for device_path, device in fido_devices.items():
-        logging.info(f"Doing ={device_path}")
-        hid = CTAPHIDDevice(device)
-        await hid.start()
+    # for device_path, device in fido_devices.items():
+    hid = CTAPHIDDevice(fido_devices)
+    await hid.start()
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     loop = asyncio.get_event_loop()
     try:
         loop.run_until_complete(start_system())
-        logging.info("FOREVER NOW")
         loop.run_forever()  # run queued dispatch tasks
         loop.close()
     except KeyboardInterrupt:
