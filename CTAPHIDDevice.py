@@ -8,15 +8,15 @@ import uhid
 
 from CMD import CTAPHID_CAPABILITIES, CTAPHID_CMD, CTAPBLE_CMD
 from CTAPBLEDevice import CTAPBLEDevice
-from CTAPBLEHIDConnection import CTAPBLEDeviceConnection
 
 CTAPHID_BROADCAST_CHANNEL = 0xFFFFFFFF
 
 
 class CTAPHIDDevice:
     device: uhid.UHIDDevice
-    ble_devices: dict[str, CTAPBLEDevice]
-    channels_to_state: dict[int, CTAPBLEDeviceConnection] = {}
+    ble_device: CTAPBLEDevice
+    channels_to_state: dict[int, bytes] = {}
+    active_channel: int
 
     hid_packet_size: int = 64
     channel: int = 0
@@ -31,15 +31,13 @@ class CTAPHIDDevice:
     ble_total_length = 0
     ble_seq = -1
 
-    nonce = 0
-
     reference_count = 0
     """Number of open handles to the device: clear state when it hits zero."""
 
-    def __init__(self, ble_devices):
+    def __init__(self, ble_device):
         # TODO: Check all BLE paired devices and announce these instead of a generic catch all device
         # This could then also include the proper name, VID, PID and so on
-        self.ble_devices = ble_devices
+        self.ble_device = ble_device
         self.device = uhid.UHIDDevice(
             vid=0xAAAA,
             pid=0xAAAA,  # these are the yubikey VID and PID. These need to change for prod.
@@ -89,48 +87,39 @@ class CTAPHIDDevice:
         self.device.receive_output = self.process_process_hid_message
 
     async def start(self):
-        logging.info("USB start init")
         await self.device.wait_for_start_asyncio()
-        logging.info("USB start done")
 
     def process_open(self):
         self.reference_count += 1
 
     def process_close(self):
         self.reference_count -= 1
-        '''
-        if self.reference_count == 0: 
-            for _, connection in self.channels_to_state.items():
-                asyncio.create_task(connection.close())
-            self.channels_to_state = {}
-            '''
 
     async def handle_init(self, channel, buffer: bytes):  # async?
         logging.info(f"hid init: channel={'%X' % channel} buffer={buffer}")
+        # Block if there is an active channel???
         if channel == CTAPHID_BROADCAST_CHANNEL and len(buffer) == 8:
-            logging.info("Broadcast")
             # https://fidoalliance.org/specs/fido-v2.1-rd-20210309/fido-client-to-authenticator-protocol-v2.1-rd-20210309.html#usb-channels
             new_channel = randint(1, CTAPHID_BROADCAST_CHANNEL - 1)
             self.channel = new_channel
-            self.nonce = buffer
 
+            await self.ble_device.connect(self.handle_ble_message)
             await self.send_init_reply(buffer, CTAPHID_BROADCAST_CHANNEL)
 
-            logging.info("scanning for BLE devices now")
+            # noinspection PyAsyncCall
+            asyncio.create_task(self.check_timeout())
+            self.active_channel = new_channel
 
-            self.channels_to_state[new_channel] = CTAPBLEDeviceConnection.create(
-                self.handle_ble_message, self.ble_devices, new_channel
-            )
-
-        elif buffer == self.nonce:
-            logging.info("Reuse")
+            self.channels_to_state[new_channel] = buffer
+        elif buffer == self.channels_to_state[channel]:
             await self.send_init_reply(buffer, self.channel)
             # ble_device = self.ble_device
 
             # if ble_device is None:
             #    return None
 
-            await self.channels_to_state[self.channel].connect()
+            await self.ble_device.connect(self.handle_ble_message)
+            self.active_channel = channel
 
     async def send_init_reply(self, nonce: bytes, channel: int):
         await self.send_hid_message(
@@ -166,7 +155,6 @@ class CTAPHIDDevice:
 
             response += b"\0" * (self.hid_packet_size - len(response))
 
-            logging.info("SENDING")
             self.device.send_input(response)
 
             offset_start += capacity
@@ -175,7 +163,6 @@ class CTAPHIDDevice:
     def process_process_hid_message(
             self, buffer: list[int], report_type: uhid._ReportType
     ) -> None:
-        logging.info("GOT MESSAGE")
         # output_report = buffer[0]
         received_data = bytes(buffer[1:])
         channel, cmd_or_seq = struct.unpack(">IB", received_data[0:5])
@@ -202,7 +189,7 @@ class CTAPHIDDevice:
             self.hid_buffer = payload_without_channel[3: 3 + self.hid_total_length]
         else:
             if cmd_or_seq != self.hid_seq + 1:
-                logging.info(f"dragons")
+                logging.error(f"Sequence out of order, expected {self.hid_seq+1} got {cmd_or_seq}")
                 # there be dragons: CTAP_STATUS.CTAP1_ERR_INVALID_SEQ
                 return
             payload = payload_without_channel[1:]
@@ -213,24 +200,25 @@ class CTAPHIDDevice:
             asyncio.create_task(self.hid_finish_receiving(channel))
 
     async def hid_finish_receiving(self, channel):
-        logging.info(f"hid rx: command={self.hid_command.name} payload={self.hid_buffer.hex()}")
-        while not self.channels_to_state[channel].ready():
+        connected_ble_device: CTAPBLEDevice = self.ble_device.get_connected_ble()
+        while connected_ble_device is None:
             await asyncio.sleep(0.5)
+            connected_ble_device: CTAPBLEDevice = self.ble_device.get_connected_ble()
+
         if self.hid_command == CTAPHID_CMD.CBOR:
-            await self.send_ble_message(channel, CTAPBLE_CMD.MSG, self.hid_buffer)
+            await connected_ble_device.send_ble_message(CTAPBLE_CMD.MSG, self.hid_buffer)
         elif self.hid_command == CTAPHID_CMD.CANCEL:
-            await self.send_ble_message(channel, CTAPBLE_CMD.CANCEL, self.hid_buffer)
+            await connected_ble_device.send_ble_message(CTAPBLE_CMD.CANCEL, self.hid_buffer)
         elif self.hid_command == CTAPHID_CMD.ERROR:
             # this should not happen, as the error is sent from the fido2 device via BLE, not from the relying party.
-            await self.send_ble_message(channel, CTAPBLE_CMD.ERROR, self.hid_buffer)
+            await connected_ble_device.send_ble_message(CTAPBLE_CMD.ERROR, self.hid_buffer)
         elif self.hid_command == CTAPHID_CMD.PING:
-            await self.send_ble_message(channel, CTAPBLE_CMD.PING, self.hid_buffer)
+            await connected_ble_device.send_ble_message(CTAPBLE_CMD.PING, self.hid_buffer)
         elif self.hid_command in (CTAPHID_CMD.INIT, CTAPHID_CMD.WINK, CTAPHID_CMD.MSG, CTAPHID_CMD.LOCK):
             # TODO
             pass
 
     def handle_ble_message(self, payload):
-        logging.info(f"Handling BLE payload {payload.hex()}")
         (cmd_or_seq,) = struct.unpack(">B", payload[0:1])
         continuation = cmd_or_seq & 0x80 == 0
         cmd_or_seq = cmd_or_seq # no adding of & 0x7F, as the command definitions include 0x80 for some reason in BLE
@@ -253,8 +241,8 @@ class CTAPHIDDevice:
             asyncio.create_task(self.ble_finish_receiving())
 
     async def ble_finish_receiving(self):
-        logging.info(f"ble rx: command={self.ble_command.name} payload={self.ble_buffer.hex()}")
-        self.channels_to_state[self.channel].keep_alive()
+        logging.info(f"ble rx: command={self.ble_command.name} payload={self.ble_buffer.hex()} device={self.ble_device.device_id}")
+        self.ble_device.keep_alive()
         if self.ble_command == CTAPBLE_CMD.MSG:
             await self.send_hid_message(CTAPHID_CMD.CBOR, self.ble_buffer)
         elif self.ble_command == CTAPBLE_CMD.KEEPALIVE:
@@ -273,20 +261,10 @@ class CTAPHIDDevice:
         self.ble_buffer = bytes()
         self.ble_seq = -1
 
-    async def send_ble_message(self, channel, command: CTAPBLE_CMD, payload:bytes):
-        logging.info(f"ble tx: command={command.name} payload={payload.hex()}")
-        offset_start = 0
-        seq = 0
-        while offset_start < len(payload):
-            if seq == 0:
-                capacity = self.fidoControlPointLength - 3
-                response = struct.pack(">BH", 0x80 | command, len(payload))
-            else:
-                capacity = self.fidoControlPointLength - 1
-                response = struct.pack(">B", seq - 1)
-            response += payload[offset_start : (offset_start + capacity)]
+    async def check_timeout(self):
+        while self.ble_device.timeout > 0:
+            self.ble_device.timeout -= 100
+            await asyncio.sleep(0.1)
 
-            await self.channels_to_state[channel].ble_device.write_data(response)
-
-            offset_start += capacity
-            seq += 1
+        await self.ble_device.disconnect()
+        self.active_channel = 0

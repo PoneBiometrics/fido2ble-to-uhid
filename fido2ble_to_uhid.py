@@ -3,6 +3,7 @@
 import asyncio
 import enum
 import logging
+from pprint import pprint
 
 from dbus_fast import BusType
 from dbus_fast.aio import MessageBus
@@ -53,24 +54,36 @@ async def find_fido() -> dict[str, CTAPBLEDevice]:
     for device_path in dbus_managed_objects:
         if 'org.bluez.Device1' in dbus_managed_objects[device_path]:
             if dbus_managed_objects[device_path]['org.bluez.Device1']['Paired'].value:
+                logging.info(f"Found {device_path} as paired")
                 if 'UUIDs' in dbus_managed_objects[device_path]['org.bluez.Device1']:
                     for uuid in dbus_managed_objects[device_path]['org.bluez.Device1']['UUIDs'].value:
                         if uuid == FIDO_SERVICE_UUID:
+                            logging.info(f"Found {uuid} in device")
                             device_proxy = bus.get_proxy_object('org.bluez', device_path,
                                                                 await bus.introspect('org.bluez', device_path))
                             device1 = device_proxy.get_interface('org.bluez.Device1')
                             fido_devices[device_path] = CTAPBLEDevice(device1, device_path)
+                            '''
+                if 'ServiceData' in dbus_managed_objects[device_path]['org.bluez.Device1']:
+                    if FIDO_SERVICE_UUID in dbus_managed_objects[device_path]['org.bluez.Device1']['ServiceData'].value.keys():
+                        logging.info(f"Found through ServiceData")
+                        device_proxy = bus.get_proxy_object('org.bluez', device_path,
+                                                            await bus.introspect('org.bluez', device_path))
+                        device1 = device_proxy.get_interface('org.bluez.Device1')
+                        fido_devices[device_path] = CTAPBLEDevice(device1, device_path)
+                        '''
     return fido_devices
 
 
 async def start_system():
     fido_devices: dict[str, CTAPBLEDevice] = await find_fido()
-    # for device_path, device in fido_devices.items():
-    hid = CTAPHIDDevice(fido_devices)
-    await hid.start()
+    hid_devices = []
+    for fido_device in fido_devices:
+        hid = CTAPHIDDevice(fido_devices[fido_device])
+        asyncio.create_task(hid.start())
+        hid_devices.append(hid)
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
     loop = asyncio.get_event_loop()
     try:
         loop.run_until_complete(start_system())

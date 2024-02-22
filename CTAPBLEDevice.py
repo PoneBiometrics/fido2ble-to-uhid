@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 import asyncio
 import logging
+import struct
 from functools import partial
 from dbus_fast import BusType
 from dbus_fast.aio import ProxyInterface, MessageBus
+
+from CMD import CTAPBLE_CMD
 
 
 def notify_message(handler, interface_name, changed_properties, invalidated_properties):
@@ -18,6 +21,7 @@ class CTAPBLEDevice:
     device: ProxyInterface  # org.bluez.Device1
     device_id: str
     connected = False
+    timeout = 5000
 
     fido_control_point: ProxyInterface  # org.bluez.GattCharacteristic1
     fido_status: ProxyInterface  # org.bluez.GattCharacteristic1
@@ -33,13 +37,12 @@ class CTAPBLEDevice:
     async def connect(self, handler):
         if self.max_msg_size == 0: # If we know Max Msg we have done this at least once. Don't want to redo it
             self.handler = partial(notify_message, handler)
-            logging.info("START CONNECT")
             bus: MessageBus = await MessageBus(bus_type=BusType.SYSTEM).connect()
-            # Must connect at least once to be able to get all the characteristics
-            # We might need to refresh through managed objects. This throws error first time on boot
+            logging.info(f"Attempting to connect to {self.device_id}")
+            # noinspection PyUnresolvedReferences
             await self.device.call_connect()
-            logging.info("connected")
-            # Hard code char ids or adaptive?
+
+            # Hard code char ids or adaptive? Need to at least check if they are available and potentially fetch again
             control_point_length_proxy = bus.get_proxy_object('org.bluez', self.device_id + '/service0019/char001f', await bus.introspect('org.bluez', self.device_id + '/service0019/char001f'))
             control_point_length = control_point_length_proxy.get_interface('org.bluez.GattCharacteristic1')
 
@@ -49,10 +52,10 @@ class CTAPBLEDevice:
 
             control_point_proxy = bus.get_proxy_object('org.bluez', self.device_id + '/service0019/char001a', await bus.introspect('org.bluez', self.device_id + '/service0019/char001a'))
             control_point = control_point_proxy.get_interface('org.bluez.GattCharacteristic1')
-
-            logging.info("get size")
+            # noinspection PyUnresolvedReferences
             self.max_msg_size = int.from_bytes(bytes(await control_point_length.call_read_value({})), "big")
             logging.info(f"size: {self.max_msg_size}")
+
             self.fido_control_point = control_point
             self.fido_status = status_characteristic
             self.fido_status_notify_listen = notify_properties
@@ -62,31 +65,61 @@ class CTAPBLEDevice:
             logging.info(f"Device already connected: {self.device_id}")
             await self.reconnect()
 
+        self.timeout = 5000  # Way higher than should be until we fix keep alive interval on card
         return self
 
     async def reconnect(self):
+        # noinspection PyUnresolvedReferences
         await self.device.call_connect()
         self.connected = True
         await self.listen_to_notify()
 
     async def disconnect(self):
+        # noinspection PyUnresolvedReferences
         self.fido_status_notify_listen.off_properties_changed(self.handler)
+        # noinspection PyUnresolvedReferences
         await self.fido_status.call_stop_notify()
+        # noinspection PyUnresolvedReferences
         await self.device.call_disconnect()
         self.connected = False
 
     async def write_data(self, payload):
-        logging.info("Starting write data")
         while not self.connected:
             logging.info("Waiting to connect")
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.5)
 
-        logging.info("Connection complete")
+        # noinspection PyUnresolvedReferences
         await self.fido_control_point.call_write_value(payload, {})
 
     async def listen_to_notify(self):
-        logging.info("Setting up listener")
+        # noinspection PyUnresolvedReferences
         self.fido_status_notify_listen.on_properties_changed(self.handler)
-        logging.info("Listener ready")
+        # noinspection PyUnresolvedReferences
         await self.fido_status.call_start_notify()
-        logging.info("Notify active")
+
+    async def send_ble_message(self, command: CTAPBLE_CMD, payload:bytes):
+        logging.info(f"ble tx: command={command.name} payload={payload.hex()} device={self.device_id}")
+        offset_start = 0
+        seq = 0
+        logging.info(f"Value of command would be {0x80 | command}")
+        while offset_start < len(payload):
+            if seq == 0:
+                capacity = self.max_msg_size - 3
+                response = struct.pack(">BH", 0x80 | command, len(payload))
+            else:
+                capacity = self.max_msg_size - 1
+                response = struct.pack(">B", seq - 1)
+            response += payload[offset_start : (offset_start + capacity)]
+
+            await self.write_data(response)
+
+            offset_start += capacity
+            seq += 1
+
+    def get_connected_ble(self):
+        if self.connected:
+            return self
+        return None
+
+    def keep_alive(self):
+        self.timeout = 5000
