@@ -47,3 +47,21 @@ class CTAPBLE_ERROR(enum.IntEnum):
     LOCK_REQUIRED = 0x0A  # only relevant in HID
     INVALID_CHANNEL = 0x0B  # only relevant in HID
     OTHER = 0x7F
+
+
+class CTAP_STATUS(enum.IntEnum):
+    """Status codes
+
+    See: https://fidoalliance.org/specs/fido-v2.1-rd-20210309/fido-client-to-authenticator-protocol-v2.1-rd-20210309.html#error-responses
+    """
+
+    CTAP1_ERR_INVALID_COMMAND = 0x01
+    """The command is not a valid CTAP command."""
+
+    CTAP1_ERR_INVALID_SEQ = 0x04
+    """Invalid message sequencing."""
+    CTAP1_ERR_INVALID_CHANNEL = 0x0B
+    """Command not allowed on this cid."""
+
+    CTAP1_ERR_OTHER = 0x7F
+    """Other unspecified error."""

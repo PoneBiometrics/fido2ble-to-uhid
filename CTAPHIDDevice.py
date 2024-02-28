@@ -2,13 +2,13 @@ import asyncio
 import logging
 import struct
 from random import randint
-from typing import List
 
 import uhid
 
 from CMD import CTAPHID_CAPABILITIES, CTAPHID_CMD, CTAPBLE_CMD
 from CTAPBLEDevice import CTAPBLEDevice
 
+# noinspection SpellCheckingInspection
 CTAPHID_BROADCAST_CHANNEL = 0xFFFFFFFF
 
 
@@ -35,7 +35,6 @@ class CTAPHIDDevice:
     """Number of open handles to the device: clear state when it hits zero."""
 
     def __init__(self, ble_device):
-        # TODO: Check all BLE paired devices and announce these instead of a generic catch all device
         # This could then also include the proper name, VID, PID and so on
         self.ble_device = ble_device
         self.device = uhid.UHIDDevice(
@@ -105,6 +104,7 @@ class CTAPHIDDevice:
 
             await self.ble_device.connect(self.handle_ble_message)
             await self.send_init_reply(buffer, CTAPHID_BROADCAST_CHANNEL)
+            logging.info(f"Init complete for {self.ble_device.device_id}")
 
             # noinspection PyAsyncCall
             asyncio.create_task(self.check_timeout())

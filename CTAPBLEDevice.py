@@ -22,6 +22,7 @@ class CTAPBLEDevice:
     device_id: str
     connected = False
     timeout = 5000
+    cached = False
 
     fido_control_point: ProxyInterface  # org.bluez.GattCharacteristic1
     fido_status: ProxyInterface  # org.bluez.GattCharacteristic1
@@ -29,10 +30,11 @@ class CTAPBLEDevice:
     max_msg_size: int
     handler = None
 
-    def __init__(self, device: ProxyInterface, device_id: str):
+    def __init__(self, device: ProxyInterface, device_id: str, cached: bool):
         self.device = device
         self.device_id = device_id
         self.max_msg_size = 0
+        self.cached = cached
 
     async def connect(self, handler):
         if self.max_msg_size == 0: # If we know Max Msg we have done this at least once. Don't want to redo it
@@ -42,11 +44,20 @@ class CTAPBLEDevice:
             # noinspection PyUnresolvedReferences
             await self.device.call_connect()
 
+            # If the OS lacked data on this before we need to re-fetch data and reconnect
+            if not self.cached:
+                await self.device.call_disconnect()
+                device_introspect = await bus.introspect('org.bluez', self.device_id)
+                device_proxy = bus.get_proxy_object('org.bluez', self.device_id, device_introspect)
+                self.device = device_proxy.get_interface('org.bluez.Device1')
+                self.cached = True
+                await self.device.call_connect()
+
             # Hard code char ids or adaptive? Need to at least check if they are available and potentially fetch again
             control_point_length_proxy = bus.get_proxy_object('org.bluez', self.device_id + '/service0019/char001f', await bus.introspect('org.bluez', self.device_id + '/service0019/char001f'))
             control_point_length = control_point_length_proxy.get_interface('org.bluez.GattCharacteristic1')
 
-            status_proxy = bus.get_proxy_object('org.bluez', self.device_id + '/service0019/char001c',  await bus.introspect('org.bluez', self.device_id + '/service0019/char001c'))
+            status_proxy = bus.get_proxy_object('org.bluez', self.device_id + '/service0019/char001c', await bus.introspect('org.bluez', self.device_id + '/service0019/char001c'))
             status_characteristic = status_proxy.get_interface('org.bluez.GattCharacteristic1')
             notify_properties = status_proxy.get_interface('org.freedesktop.DBus.Properties')
 
@@ -66,6 +77,7 @@ class CTAPBLEDevice:
             await self.reconnect()
 
         self.timeout = 5000  # Way higher than should be until we fix keep alive interval on card
+        logging.info(f"Connection complete: {self.device_id}")
         return self
 
     async def reconnect(self):
