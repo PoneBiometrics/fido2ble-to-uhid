@@ -88,6 +88,7 @@ class CTAPBLEDevice:
 
     async def disconnect(self):
         # noinspection PyUnresolvedReferences
+        logging.info(f"Disconnecting: {self.device_id}")
         self.fido_status_notify_listen.off_properties_changed(self.handler)
         # noinspection PyUnresolvedReferences
         await self.fido_status.call_stop_notify()
@@ -110,11 +111,11 @@ class CTAPBLEDevice:
         await self.fido_status.call_start_notify()
 
     async def send_ble_message(self, command: CTAPBLE_CMD, payload:bytes):
-        logging.info(f"ble tx: command={command.name} payload={payload.hex()} device={self.device_id}")
+        logging.info(f"ble tx: command={command.name} device={self.device_id} payload={payload.hex()}")
         offset_start = 0
         seq = 0
-        logging.info(f"Value of command would be {0x80 | command}")
-        while offset_start < len(payload):
+        logging.info(f"Value of command would be {hex(0x80 | command)}")
+        while offset_start < len(payload) or offset_start == 0:
             if seq == 0:
                 capacity = self.max_msg_size - 3
                 response = struct.pack(">BH", 0x80 | command, len(payload))
