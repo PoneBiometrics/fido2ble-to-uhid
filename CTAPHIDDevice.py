@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import struct
+import sys
 from random import randint
 
 import uhid
@@ -39,49 +40,53 @@ class CTAPHIDDevice:
     def __init__(self, ble_device):
         # This could then also include the proper name, VID, PID and so on
         self.ble_device = ble_device
-        self.device = uhid.UHIDDevice(
-            vid=0xAAAA,
-            pid=0xAAAA,  # these are the yubikey VID and PID. These need to change for prod.
-            name="PONE Fido2BLE Proxy",
-            report_descriptor=[
-                0x06,
-                0xD0,
-                0xF1,  # Usage Page (FIDO alliance HID usage page)
-                0x09,
-                0x01,  # Usage (U2FHID usage for top-level collection)
-                0xA1,
-                0x01,  # Collection (Application)
-                0x09,
-                0x20,  #   Usage (Raw IN data report)
-                0x15,
-                0x00,  #   Logical Minimum (0)
-                0x26,
-                0xFF,
-                0x00,  #   Logical Maximum (255)
-                0x75,
-                0x08,  #   Report Size (8)
-                0x95,
-                0x40,  #   Report Count (64)
-                0x81,
-                0x02,  #   Input (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
-                0x09,
-                0x21,  #   Usage (Raw OUT data report)
-                0x15,
-                0x00,  #   Logical Minimum (0)
-                0x26,
-                0xFF,
-                0x00,  #   Logical Maximum (255)
-                0x75,
-                0x08,  #   Report Size (8)
-                0x95,
-                0x40,  #   Report Count (64)
-                0x91,
-                0x02,  #   Output (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
-                0xC0,  # End Collection
-            ],
-            backend=uhid.AsyncioBlockingUHID,
-            physical_name="Test Device"
-        )
+        try:
+            self.device = uhid.UHIDDevice(
+                vid=0xAAAA,
+                pid=0xAAAA,  # these are the yubikey VID and PID. These need to change for prod.
+                name="PONE Fido2BLE Proxy",
+                report_descriptor=[
+                    0x06,
+                    0xD0,
+                    0xF1,  # Usage Page (FIDO alliance HID usage page)
+                    0x09,
+                    0x01,  # Usage (U2FHID usage for top-level collection)
+                    0xA1,
+                    0x01,  # Collection (Application)
+                    0x09,
+                    0x20,  # Usage (Raw IN data report)
+                    0x15,
+                    0x00,  # Logical Minimum (0)
+                    0x26,
+                    0xFF,
+                    0x00,  # Logical Maximum (255)
+                    0x75,
+                    0x08,  # Report Size (8)
+                    0x95,
+                    0x40,  # Report Count (64)
+                    0x81,
+                    0x02,  # Input (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
+                    0x09,
+                    0x21,  # Usage (Raw OUT data report)
+                    0x15,
+                    0x00,  # Logical Minimum (0)
+                    0x26,
+                    0xFF,
+                    0x00,  # Logical Maximum (255)
+                    0x75,
+                    0x08,  # Report Size (8)
+                    0x95,
+                    0x40,  # Report Count (64)
+                    0x91,
+                    0x02,  # Output (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
+                    0xC0,  # End Collection
+                ],
+                backend=uhid.AsyncioBlockingUHID,
+                physical_name="Test Device",
+            )
+        except PermissionError:
+            print("Not enough permissions to access /dev/uhid. Rerun as root?")
+            sys.exit(1)
 
         self.device.receive_open = self.process_open
         self.device.receive_close = self.process_close
