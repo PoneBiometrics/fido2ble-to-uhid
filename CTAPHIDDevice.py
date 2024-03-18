@@ -115,7 +115,7 @@ class CTAPHIDDevice:
         # TODO Handling cancel
 
     async def handle_init(self, channel, buffer: bytes):
-        logging.info(f"hid init: channel={'%X' % channel} buffer={buffer} device={self.device}")
+        logging.debug(f"hid init: channel={'%X' % channel} buffer={buffer} device={self.device}")
         # Block if there is an active channel???
         if channel == CTAPHID_BROADCAST_CHANNEL and len(buffer) == 8:
             # https://fidoalliance.org/specs/fido-v2.1-rd-20210309/fido-client-to-authenticator-protocol-v2.1-rd-20210309.html#usb-channels
@@ -124,12 +124,12 @@ class CTAPHIDDevice:
             try:
                 await self.ble_device.connect(self.handle_ble_message)
             except DBusError:
-                logging.info(f"Unable to connect to {self.ble_device.device_id}")
+                logging.warning(f"Unable to connect to {self.ble_device.device_id}")
                 # Failed to connect, we abort now
                 return
             self.channel = new_channel
             await self.send_init_reply(buffer, CTAPHID_BROADCAST_CHANNEL)
-            logging.info(f"Init complete for {self.ble_device.device_id}")
+            logging.debug(f"Init complete for {self.ble_device.device_id}")
 
             # noinspection PyAsyncCall
             asyncio.create_task(self.check_timeout())
@@ -164,7 +164,7 @@ class CTAPHIDDevice:
         pass
 
     async def send_hid_message(self, command: CTAPHID_CMD, payload: bytes, channel: int = None):
-        logging.info(f"hid tx: command={command.name} payload={payload.hex()}")
+        logging.debug(f"hid tx: command={command.name} payload={payload.hex()}")
         if channel is None:
             channel = self.channel
         offset_start = 0
@@ -218,12 +218,9 @@ class CTAPHIDDevice:
         elif self.hid_command == CTAPHID_CMD.CANCEL:
             await connected_ble_device.send_ble_message(CTAPBLE_CMD.CANCEL, self.hid_buffer)
             await self.ble_device.disconnect()
-            logging.info("Gonna start killing things")
             for task in self.active_tasks:
-                logging.info(f"Task {task} is {task.done()}")
                 if not task.done():
                     await task.cancel()
-            logging.info(f"Everything is dead")
             self.active_tasks = []
         elif self.hid_command == CTAPHID_CMD.ERROR:
             # this should not happen, as the error is sent from the fido2 device via BLE, not from the relying party.
@@ -242,7 +239,7 @@ class CTAPHIDDevice:
         if not continuation:
             self.ble_command = CTAPBLE_CMD(cmd_or_seq)
             (self.ble_total_length,) = struct.unpack(">H", payload[1:3])
-            self.ble_buffer = payload[3 : 3 + self.ble_total_length]
+            self.ble_buffer = payload[3: 3 + self.ble_total_length]
             self.ble_seq = -1
         else:
             payload = payload[1:]
@@ -257,7 +254,7 @@ class CTAPHIDDevice:
             self.active_tasks.append(asyncio.create_task(self.ble_finish_receiving()))
 
     async def ble_finish_receiving(self):
-        logging.info(f"ble rx: command={self.ble_command.name} payload={self.ble_buffer.hex()} device={self.ble_device.device_id}")
+        logging.debug(f"ble rx: command={self.ble_command.name} payload={self.ble_buffer.hex()} device={self.ble_device.device_id}")
         self.ble_device.keep_alive()
         if self.ble_command == CTAPBLE_CMD.MSG:
             await self.send_hid_message(CTAPHID_CMD.CBOR, self.ble_buffer)
@@ -282,13 +279,10 @@ class CTAPHIDDevice:
             self.ble_device.timeout -= 100
             await asyncio.sleep(0.1)
 
-        logging.info(f"Gonna disconnect {self.ble_device.device_id}")
         await self.ble_device.disconnect()
-        logging.info("Gonna start killing things")
         for task in self.active_tasks:
-            logging.info(f"Task {task} is {task.done()}")
+            logging.debug(f"Task {task} is {task.done()}")
             if not task.done():
                 task.cancel()
-        logging.info(f"Everything is dead")
         self.active_tasks = []
         self.active_channel = 0

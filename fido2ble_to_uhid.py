@@ -44,15 +44,14 @@ async def find_fido() -> dict[str, CTAPBLEDevice]:
     for device_path in dbus_managed_objects:
         if 'org.bluez.Device1' in dbus_managed_objects[device_path]:
             if dbus_managed_objects[device_path]['org.bluez.Device1']['Paired'].value:
-                logging.info(f"Found {device_path} as paired")
                 if 'UUIDs' in dbus_managed_objects[device_path]['org.bluez.Device1']:
                     for uuid in dbus_managed_objects[device_path]['org.bluez.Device1']['UUIDs'].value:
                         if uuid == FIDO_SERVICE_UUID:
-                            logging.info(f"Found {uuid} in device")
+                            logging.debug(f"Found {device_path} as FIDO device")
                             fido_devices[device_path] = await create_device(device_path, dbus_managed_objects, bus)
                 elif 'ServiceData' in dbus_managed_objects[device_path]['org.bluez.Device1']:
                     if FIDO_SERVICE_UUID in dbus_managed_objects[device_path]['org.bluez.Device1']['ServiceData'].value.keys():
-                        logging.info(f"Found through ServiceData")
+                        logging.debug(f"Found {device_path} as FIDO device")
                         fido_devices[device_path] = await create_device(device_path, dbus_managed_objects, bus)
     return fido_devices
 
@@ -62,6 +61,7 @@ async def start_system():
     hid_devices = []
     for fido_device in fido_devices:
         hid = CTAPHIDDevice(fido_devices[fido_device])
+        # noinspection PyAsyncCall
         asyncio.create_task(hid.start())
         hid_devices.append(hid)
 

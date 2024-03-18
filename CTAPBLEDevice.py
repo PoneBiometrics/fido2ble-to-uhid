@@ -40,11 +40,11 @@ class CTAPBLEDevice:
         if self.max_msg_size == 0: # If we know Max Msg we have done this at least once. Don't want to redo it
             self.handler = partial(notify_message, handler)
             bus: MessageBus = await MessageBus(bus_type=BusType.SYSTEM).connect()
-            logging.info(f"Attempting to connect to {self.device_id}")
+            logging.debug(f"Attempting to connect to {self.device_id}")
             # noinspection PyUnresolvedReferences
             await self.device.call_connect()
 
-            # If the OS lacked data on this before we need to re-fetch data and reconnect
+            # If the OS lacked data on this before we need to re-fetch data and reconnect but has to be a better way somehow
             if not self.cached:
                 await self.device.call_disconnect()
                 device_introspect = await bus.introspect('org.bluez', self.device_id)
@@ -53,7 +53,7 @@ class CTAPBLEDevice:
                 self.cached = True
                 await self.device.call_connect()
 
-            # Hard code char ids or adaptive? Need to at least check if they are available and potentially fetch again
+            # Hardcode char ids or adaptive? char001f, char001c and char001a on service0019 always seem to reflect what we need, not sure why
             control_point_length_proxy = bus.get_proxy_object('org.bluez', self.device_id + '/service0019/char001f', await bus.introspect('org.bluez', self.device_id + '/service0019/char001f'))
             control_point_length = control_point_length_proxy.get_interface('org.bluez.GattCharacteristic1')
 
@@ -65,7 +65,7 @@ class CTAPBLEDevice:
             control_point = control_point_proxy.get_interface('org.bluez.GattCharacteristic1')
             # noinspection PyUnresolvedReferences
             self.max_msg_size = int.from_bytes(bytes(await control_point_length.call_read_value({})), "big")
-            logging.info(f"size: {self.max_msg_size}")
+            logging.debug(f"size: {self.max_msg_size}")
 
             self.fido_control_point = control_point
             self.fido_status = status_characteristic
@@ -73,11 +73,11 @@ class CTAPBLEDevice:
             self.connected = True
             await self.listen_to_notify()
         else:
-            logging.info(f"Device already connected: {self.device_id}")
+            logging.debug(f"Device already connected: {self.device_id}")
             await self.reconnect()
 
         self.timeout = 5000  # Way higher than should be until we fix keep alive interval on card
-        logging.info(f"Connection complete: {self.device_id}")
+        logging.debug(f"Connection complete: {self.device_id}")
         return self
 
     async def reconnect(self):
@@ -88,7 +88,7 @@ class CTAPBLEDevice:
 
     async def disconnect(self):
         # noinspection PyUnresolvedReferences
-        logging.info(f"Disconnecting: {self.device_id}")
+        logging.debug(f"Disconnecting: {self.device_id}")
         self.fido_status_notify_listen.off_properties_changed(self.handler)
         # noinspection PyUnresolvedReferences
         await self.fido_status.call_stop_notify()
@@ -98,7 +98,7 @@ class CTAPBLEDevice:
 
     async def write_data(self, payload):
         while not self.connected:
-            logging.info("Waiting to connect")
+            logging.debug("Waiting to connect")
             await asyncio.sleep(0.5)
 
         # noinspection PyUnresolvedReferences
@@ -111,10 +111,9 @@ class CTAPBLEDevice:
         await self.fido_status.call_start_notify()
 
     async def send_ble_message(self, command: CTAPBLE_CMD, payload:bytes):
-        logging.info(f"ble tx: command={command.name} device={self.device_id} payload={payload.hex()}")
+        logging.debug(f"ble tx: command={command.name} device={self.device_id} payload={payload.hex()}")
         offset_start = 0
         seq = 0
-        logging.info(f"Value of command would be {hex(0x80 | command)}")
         while offset_start < len(payload) or offset_start == 0:
             if seq == 0:
                 capacity = self.max_msg_size - 3
