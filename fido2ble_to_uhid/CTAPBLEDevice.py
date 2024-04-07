@@ -6,7 +6,7 @@ from functools import partial
 from dbus_fast import BusType
 from dbus_fast.aio import ProxyInterface, MessageBus
 
-from CMD import CTAPBLE_CMD
+from .CMD import CTAPBLE_CMD
 
 
 def notify_message(handler, interface_name, changed_properties, invalidated_properties):

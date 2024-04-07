@@ -1,0 +1,6 @@
+/python3-fido2ble-to-uhid
+/fido2ble-to-uhid
+/debhelper-build-stamp
+/files
+/*.debhelper
+/*.substvars
