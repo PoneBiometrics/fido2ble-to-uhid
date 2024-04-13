@@ -6,8 +6,8 @@ import logging
 from dbus_fast import BusType
 from dbus_fast.aio import MessageBus
 
-from CTAPBLEDevice import CTAPBLEDevice
-from CTAPHIDDevice import CTAPHIDDevice
+from .CTAPBLEDevice import CTAPBLEDevice
+from .CTAPHIDDevice import CTAPHIDDevice
 
 FIDO_SERVICE_UUID = "0000fffd-0000-1000-8000-00805f9b34fb"
 FIDO_CONTROL_POINT_UUID = "f1d0fff1-deaa-ecee-b42f-c9ba7ed623bb"
@@ -65,7 +65,7 @@ async def start_system():
         asyncio.create_task(hid.start())
         hid_devices.append(hid)
 
-if __name__ == "__main__":
+def main():
     loop = asyncio.get_event_loop()
     try:
         loop.run_until_complete(start_system())
@@ -73,3 +73,6 @@ if __name__ == "__main__":
         loop.close()
     except KeyboardInterrupt:
         loop.close()
+
+if __name__ == "__main__":
+    main()

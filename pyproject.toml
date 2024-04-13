@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fido2ble-to-uhid"
+version = "0.0.1"
+dependencies = [
+#    "uhid",
+    "dbus-fast",
+]
+
+[project.scripts]
+fido2ble-to-uhid = "fido2ble_to_uhid.fido2ble_to_uhid:main"
