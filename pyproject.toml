@@ -12,3 +12,5 @@ dependencies = [
 
 [project.scripts]
 fido2ble-to-uhid = "fido2ble_to_uhid.fido2ble_to_uhid:main"
+[tool.setuptools.packages]
+find = {}

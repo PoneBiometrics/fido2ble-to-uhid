@@ -10,6 +10,7 @@ ExecStart=/usr/bin/fido2ble-to-uhid
 # DynamicUser=yes
 # ProtectSystem=yes
 # ReadWritePaths=/dev/uhid
+User=root
 
 [Install]
 WantedBy=multi-user.target
