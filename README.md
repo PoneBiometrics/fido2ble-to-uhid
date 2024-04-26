@@ -2,26 +2,29 @@
 Bridging FIDO2 BLE devices to the HID bus via /dev/uhid so they can be used in browsers
 
 
-
 ## Dependencies on debian-based systems
 
+For development on the python code you need to run 
 ```
-apt install python3-bleak
-pip install --break-system-packages uhid
+pip install uhid dbus-fast
 ```
-We still have to work on proper packaging.
-
 
 ## Running it
 
 Run the following command in a new shell:
 
 ```
-./fido2ble_to_uhid.py
+fido2ble_to_uhid/fido2ble_to_uhid.py
 ```
+The above needs some elevated privileges, either through running as root, sudo or by granting python the capabilities needed.
 
-### Verifying that it runs
+## As a debian package
 
+The code can also be built as a debian package and installed that way. It requires a minimum of Debian Bullseye (11) or Ubuntu Manic Minotaur (23) to build and install. 
+Running `debuild` in the base folder will create the needed files. 
+
+## Verifying that it runs
+The system can be verified to work through either [libfido2](https://github.com/Yubico/libfido2) or just testing it in a browser. Below is an example of how this would be done 
 ```
 $ fido2-token -L
 /dev/hidraw0: vendor=0xaaaa, product=0xaaaa ( )
@@ -67,47 +70,7 @@ fido2-assert -G -i assert_param /dev/hidraw0 | fido2-assert -V pubkey es256
 
 ### Notes
 
-Once you run a command that will actively connect to the card, you need to press the button of the OFFPAD.
-It currently only works, if the OFFPAD is paired but not connected via BLE. This is a limitation of the used library `BLEAK`.
-However, this can be overcome by implementing the Bluetooth logic in `dbus_fast`
-
-### Debugging FIDO2 Payload
-```
-INFO:root:scanning for BLE devices now
-INFO:root:dev C9:E8:2B:06:B2:F0 services ['00001800-0000-1000-8000-00805f9b34fb', '00001801-0000-1000-8000-00805f9b34fb', '0000180a-0000-1000-8000-00805f9b34fb', '0000180f-0000-1000-8000-00805f9b34fb', '0000fffd-0000-1000-8000-00805f9b34fb', '5c050001-04fb-4d23-affd-179fc92c557f']
-INFO:root:service revision: 0x20
-INFO:root:setting to 0x20
-INFO:root:fidoControlPointLength: 60
-INFO:root:hid tx: command=INIT payload=18f6c3e78cb9864c10454010020001010c
-INFO:root:hid rx: command=CBOR payload=04
-INFO:root:ble tx: command=MSG payload=04
-INFO:root:ble rx: command=KEEPALIVE payload=01
-INFO:root:hid tx: command=KEEPALIVE payload=01
-INFO:root:ble rx: command=MSG payload=00ad0182684649444f5f325f30684649444f5f325f3102826b686d61632d7365637265746b6372656450726f74656374035069700f79d1fb472ebd9ba3a3b9a9eda004a962726bf5627570f5627576f564706c6174f468616c776179735576f468637265644d676d74f569636c69656e7450696ef56e70696e557641757468546f6b656ef5706d616b654372656455764e6f74527164f50519040006820102098163626c650a82a263616c672664747970656a7075626c69632d6b6579a263616c6739010064747970656a7075626c69632d6b65790cf40d040e0111081203
-INFO:root:hid tx: command=CBOR payload=00ad0182684649444f5f325f30684649444f5f325f3102826b686d61632d7365637265746b6372656450726f74656374035069700f79d1fb472ebd9ba3a3b9a9eda004a962726bf5627570f5627576f564706c6174f468616c776179735576f468637265644d676d74f569636c69656e7450696ef56e70696e557641757468546f6b656ef5706d616b654372656455764e6f74527164f50519040006820102098163626c650a82a263616c672664747970656a7075626c69632d6b6579a263616c6739010064747970656a7075626c69632d6b65790cf40d040e0111081203
-INFO:root:hid rx: command=CBOR payload=04
-INFO:root:ble tx: command=MSG payload=04
-INFO:root:ble rx: command=MSG payload=00ad0182684649444f5f325f30684649444f5f325f3102826b686d61632d7365637265746b6372656450726f74656374035069700f79d1fb472ebd9ba3a3b9a9eda004a962726bf5627570f5627576f564706c6174f468616c776179735576f468637265644d676d74f569636c69656e7450696ef56e70696e557641757468546f6b656ef5706d616b654372656455764e6f74527164f50519040006820102098163626c650a82a263616c672664747970656a7075626c69632d6b6579a263616c6739010064747970656a7075626c69632d6b65790cf40d040e0111081203
-INFO:root:hid tx: command=CBOR payload=00ad0182684649444f5f325f30684649444f5f325f3102826b686d61632d7365637265746b6372656450726f74656374035069700f79d1fb472ebd9ba3a3b9a9eda004a962726bf5627570f5627576f564706c6174f468616c776179735576f468637265644d676d74f569636c69656e7450696ef56e70696e557641757468546f6b656ef5706d616b654372656455764e6f74527164f50519040006820102098163626c650a82a263616c672664747970656a7075626c69632d6b6579a263616c6739010064747970656a7075626c69632d6b65790cf40d040e0111081203
-INFO:root:hid rx: command=CBOR payload=06a201010201
-INFO:root:ble tx: command=MSG payload=06a201010201
-INFO:root:ble rx: command=MSG payload=00a10308
-INFO:root:hid tx: command=CBOR payload=00a10308
-INFO:root:hid rx: command=CBOR payload=06a201010207
-INFO:root:ble tx: command=MSG payload=06a201010207
-INFO:root:ble rx: command=MSG payload=00a10508
-INFO:root:hid tx: command=CBOR payload=00a10508
-INFO:root:hid rx: command=CBOR payload=40a201010207
-INFO:root:ble tx: command=MSG payload=40a201010207
-INFO:root:ble rx: command=MSG payload=01
-INFO:root:hid tx: command=CBOR payload=01
-```
-
-It works perfectly fine with `fido2-token`, `fido2-cred`, and `fido2-assert`
-
-In principle, this also works with the Chrome and Firefox. Give it a try!
-
-My current (horribly outdated) firmware version still has some issues, probably related to not having my finger print properly enrolled when I try it out with Chrome and https://webauthn.io, however the forwarding of the HID and BLE packets looks fine. 
+It currently only works, if the OFFPAD is previously paired. The code is also set to find OFFPADs as FIDO devices only.
 
 ## Credit
 `/dev/uhid` handling took a lot of notes from https://github.com/BryanJacobs/fido2-hid-bridge but was rewritten significantly.
