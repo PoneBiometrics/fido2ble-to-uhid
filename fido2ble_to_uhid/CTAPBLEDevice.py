@@ -3,8 +3,8 @@ import asyncio
 import logging
 import struct
 from functools import partial
-from dbus_fast import BusType
-from dbus_fast.aio import ProxyInterface, MessageBus
+from .vendored.dbus_fast import BusType
+from .vendored.dbus_fast.aio import ProxyInterface, MessageBus
 
 from .CMD import CTAPBLE_CMD
 
