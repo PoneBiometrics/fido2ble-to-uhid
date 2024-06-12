@@ -67,10 +67,43 @@ tail -n +2 cred > pubkey
 fido2-assert -G -i assert_param /dev/hidraw0 | fido2-assert -V pubkey es256
 ```
 
+### Pairing
+
+The easiest way to pair a new OFFPAD is through a terminal with bluetoothctl
+
+Turning on scanning can be done through 
+
+```
+bluetoothctl scan on
+```
+
+This will then list all devices found as they get found and will run in the foreground. The job can be either backgrounded or the rest of the commands run in a new terminal.
+
+Devices can then be listed with `bluetoothctl devices` which will display all found devices. To easily pair the OFFPAD running
+
+```
+bluetoothctl devices | grep OFFPAD
+```
+
+Will list any OFFPADs found. The OFFPAD will show as something like
+
+```
+Device 12:34:56:78:9A:BC OFFPAD
+```
+
+It is important to note the MAC address here as by doing 
+
+```
+bluetoothctl pair 12:34:56:78:9A:BC
+```
+
+The OFFPAD will prompt for a pairing code and after that the OFFPAD is paired. We can then turn of the scan that we either sent to the background or have in a different tab. If we backgrounded it, running `fg` will bring it to the foreground before we terminate it with `CTRL+C`
 
 ### Notes
 
-It currently only works, if the OFFPAD is previously paired. The code is also set to find OFFPADs as FIDO devices only.
+It currently only works, if the OFFPAD is previously paired. The code is also set to find OFFPADs as FIDO devices only. If any changes happen to pairings, either new pairing or a removal, the python application must be restarted to updates the UHID devices available.  
+
+
 
 ## Credit
 `/dev/uhid` handling took a lot of notes from https://github.com/BryanJacobs/fido2-hid-bridge but was rewritten significantly.
