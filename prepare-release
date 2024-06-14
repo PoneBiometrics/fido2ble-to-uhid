@@ -1,0 +1,48 @@
+#!/bin/bash
+
+set +x
+
+debuild
+VERSION="$(dpkg-parsechangelog -S Version)"
+
+rm -rf release-files
+mkdir -p release-files
+
+cp ../fido2ble-to-uhid_${VERSION}_all.deb release-files/
+cp ../fido2ble-to-uhid_${VERSION}.dsc release-files/
+cp ../fido2ble-to-uhid_${VERSION}.tar.xz release-files/
+
+cd release-files
+dpkg-scanpackages . /dev/null > Packages
+gzip --keep --force -9 Packages
+xz --keep --force -9 Packages
+
+dpkg-scansources . > Sources
+gzip --keep --force -9 Sources
+xz --keep --force -9 Sources
+
+
+# Generate the Release file
+# cat conf/distributions > Release ## this can be ignored
+# The Date: field has the same format as the Debian package changelog entries,
+# that is, RFC 2822 with time zone +0000
+echo -e "Date: `LANG=C date -Ru`" >> Release
+echo -e "Suite: ./" >> Release
+# Release must contain MD5 sums of all repository files (in a simple repo just the Packages and Packages.gz files)
+echo -e 'MD5Sum:' >> Release
+printf ' '$(md5sum Packages.gz | cut --delimiter=' ' --fields=1)' %16d Packages.gz' $(wc --bytes Packages.gz | cut --delimiter=' ' --fields=1) >> Release
+printf '\n '$(md5sum Packages.xz | cut --delimiter=' ' --fields=1)' %16d Packages.xz' $(wc --bytes Packages.xz | cut --delimiter=' ' --fields=1) >> Release
+printf '\n '$(md5sum Packages | cut --delimiter=' ' --fields=1)' %16d Packages' $(wc --bytes Packages | cut --delimiter=' ' --fields=1) >> Release
+printf '\n '$(md5sum Sources.gz | cut --delimiter=' ' --fields=1)' %16d Sources.gz' $(wc --bytes Sources.gz | cut --delimiter=' ' --fields=1) >> Release
+printf '\n '$(md5sum Sources.xz | cut --delimiter=' ' --fields=1)' %16d Sources.xz' $(wc --bytes Sources.xz | cut --delimiter=' ' --fields=1) >> Release
+printf '\n '$(md5sum Sources | cut --delimiter=' ' --fields=1)' %16d Sources' $(wc --bytes Sources | cut --delimiter=' ' --fields=1) >> Release
+# Release must contain SHA256 sums of all repository files (in a simple repo just the Packages and Packages.gz files)
+echo -e '\nSHA256:' >> Release
+printf ' '$(sha256sum Packages.gz | cut --delimiter=' ' --fields=1)' %16d Packages.gz' $(wc --bytes Packages.gz | cut --delimiter=' ' --fields=1) >> Release
+printf ' '$(sha256sum Packages.xz | cut --delimiter=' ' --fields=1)' %16d Packages.xz' $(wc --bytes Packages.xz | cut --delimiter=' ' --fields=1) >> Release
+printf ' '$(sha256sum Packages | cut --delimiter=' ' --fields=1)' %16d Packages' $(wc --bytes Packages | cut --delimiter=' ' --fields=1) >> Release
+printf ' '$(sha256sum Sources.gz | cut --delimiter=' ' --fields=1)' %16d Sources.gz' $(wc --bytes Sources.gz | cut --delimiter=' ' --fields=1) >> Release
+printf ' '$(sha256sum Sources.xz | cut --delimiter=' ' --fields=1)' %16d Sources.xz' $(wc --bytes Sources.xz | cut --delimiter=' ' --fields=1) >> Release
+printf ' '$(sha256sum Sources | cut --delimiter=' ' --fields=1)' %16d Sources' $(wc --bytes Sources | cut --delimiter=' ' --fields=1) >> Release
+
+gpg --clearsign --digest-algo SHA512 --local-user $USER -o InRelease Release
