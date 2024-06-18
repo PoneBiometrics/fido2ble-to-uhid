@@ -3,8 +3,8 @@
 import asyncio
 import logging
 
-from dbus_fast import BusType
-from dbus_fast.aio import MessageBus
+from .vendored.dbus_fast import BusType
+from .vendored.dbus_fast.aio import MessageBus
 
 from .CTAPBLEDevice import CTAPBLEDevice
 from .CTAPHIDDevice import CTAPHIDDevice

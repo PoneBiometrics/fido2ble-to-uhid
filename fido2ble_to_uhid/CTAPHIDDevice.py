@@ -5,7 +5,7 @@ import sys
 from random import randint
 
 from .vendored import uhid
-from dbus_fast import DBusError
+from .vendored.dbus_fast import DBusError
 
 from .CMD import CTAPHID_CAPABILITIES, CTAPHID_CMD, CTAPBLE_CMD
 from .CTAPBLEDevice import CTAPBLEDevice
