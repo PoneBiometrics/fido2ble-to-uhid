@@ -1,6 +1,11 @@
 # fido2ble-to-uhid
 Bridging FIDO2 BLE devices to the HID bus via /dev/uhid so they can be used in browsers
 
+## Installation
+
+The easiest way to install is by using the `.deb` from the [releases](https://github.com/PoneBiometrics/fido2ble-to-uhid/releases) page. This can the be installed through `apt install`. This will then add the release page to the repositores and it can then be updated through `apt update && apt upgrade`
+
+The second option would be to running it manually from the reposistory as instructed below.
 
 ## Dependencies on debian-based systems
 
