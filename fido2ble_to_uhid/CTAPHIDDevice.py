@@ -40,11 +40,15 @@ class CTAPHIDDevice:
     def __init__(self, ble_device):
         # This could then also include the proper name, VID, PID and so on
         self.ble_device = ble_device
+        addr = ble_device.device_id.split("_")[1:]
+        vid = int("".join(addr[0:2]), 16)
+        pid = int("".join(addr[2:4]), 16)
+        name = "PONE Fido2BLE Proxy %s" % (":".join(addr))
         try:
             self.device = uhid.UHIDDevice(
-                vid=0xAAAA,
-                pid=0xAAAA,  # these are the yubikey VID and PID. These need to change for prod.
-                name="PONE Fido2BLE Proxy",
+                vid,
+                pid,
+                name,
                 report_descriptor=[
                     0x06,
                     0xD0,
