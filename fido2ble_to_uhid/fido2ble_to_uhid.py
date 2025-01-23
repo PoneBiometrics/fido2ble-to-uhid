@@ -6,7 +6,7 @@ import logging
 from .vendored.dbus_fast import BusType
 from .vendored.dbus_fast.aio import MessageBus
 
-from .CTAPBLEDevice import CTAPBLEDevice
+from .CTAPBLEDevice import CTAPBLEDevice, find_characteristics
 from .CTAPHIDDevice import CTAPHIDDevice
 
 FIDO_SERVICE_UUID = "0000fffd-0000-1000-8000-00805f9b34fb"
@@ -18,7 +18,6 @@ FIDO_SERVICE_REVISION_BITFIELD_UUID = "f1d0fff4-deaa-ecee-b42f-c9ba7ed623bb"
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("UHIDDevice").setLevel(logging.ERROR)
 
-
 async def create_device(device_path, dbus_managed_objects, bus) -> CTAPBLEDevice:
     device_proxy = bus.get_proxy_object('org.bluez', device_path, await bus.introspect('org.bluez', device_path))
     device1 = device_proxy.get_interface('org.bluez.Device1')
@@ -27,7 +26,19 @@ async def create_device(device_path, dbus_managed_objects, bus) -> CTAPBLEDevice
         if key.startswith(device_path + '/'):
             cached = True
             break
-    return CTAPBLEDevice(device1, device_path, cached)
+
+    # Create a map to store characteristic paths
+    characteristic_paths = {
+        FIDO_CONTROL_POINT_UUID: None,
+        FIDO_CONTROL_POINT_LENGTH_UUID: None,
+        FIDO_STATUS_UUID: None,
+    }
+
+    await find_characteristics(device_path, dbus_managed_objects, characteristic_paths)
+    control_point_path = characteristic_paths[FIDO_CONTROL_POINT_UUID]
+    control_point_length_path = characteristic_paths[FIDO_CONTROL_POINT_LENGTH_UUID]
+    status_path = characteristic_paths[FIDO_STATUS_UUID]
+    return CTAPBLEDevice(device1, device_path, cached, control_point_path, control_point_length_path, status_path)
 
 
 async def find_fido() -> dict[str, CTAPBLEDevice]:

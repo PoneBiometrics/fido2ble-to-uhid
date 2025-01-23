@@ -16,6 +16,26 @@ def notify_message(handler, interface_name, changed_properties, invalidated_prop
     if 'Value' in changed_properties:
         handler(changed_properties['Value'].value)
 
+FIDO_CONTROL_POINT_UUID = "f1d0fff1-deaa-ecee-b42f-c9ba7ed623bb"
+FIDO_STATUS_UUID = "f1d0fff2-deaa-ecee-b42f-c9ba7ed623bb"
+FIDO_CONTROL_POINT_LENGTH_UUID = "f1d0fff3-deaa-ecee-b42f-c9ba7ed623bb"
+FIDO_SERVICE_REVISION_BITFIELD_UUID = "f1d0fff4-deaa-ecee-b42f-c9ba7ed623bb"
+
+async def find_characteristics(device_path, objects, characteristic_paths):
+    # Iterate through objects to find the characteristic with the target UUID
+    if objects is None:
+        bus: MessageBus = await MessageBus(bus_type=BusType.SYSTEM).connect()
+        bluez_introspect = await bus.introspect("org.bluez",'/')
+        dbus_proxy = bus.get_proxy_object('org.bluez','/', bluez_introspect)
+        objects = await dbus_proxy.get_interface("org.freedesktop.DBus.ObjectManager").call_get_managed_objects()
+
+    for path, interfaces in objects.items():
+        if path.startswith(device_path):
+            if "org.bluez.GattCharacteristic1" in interfaces:
+                characteristic_props = interfaces["org.bluez.GattCharacteristic1"]
+                uuid = characteristic_props.get("UUID").value
+                if uuid in characteristic_paths:
+                    characteristic_paths[uuid] = path
 
 class CTAPBLEDevice:
     device: ProxyInterface  # org.bluez.Device1
@@ -24,17 +44,23 @@ class CTAPBLEDevice:
     timeout = 5000
     cached = False
 
+    fido_control_point_path: str
     fido_control_point: ProxyInterface  # org.bluez.GattCharacteristic1
+    fido_control_point_length_path: str
+    fido_status_path: str
     fido_status: ProxyInterface  # org.bluez.GattCharacteristic1
     fido_status_notify_listen: ProxyInterface  # org.freedesktop.DBus.Properties
     max_msg_size: int
     handler = None
 
-    def __init__(self, device: ProxyInterface, device_id: str, cached: bool):
+    def __init__(self, device: ProxyInterface, device_id: str, cached: bool, control_point_path, control_point_length_path, status_path):
         self.device = device
         self.device_id = device_id
         self.max_msg_size = 0
         self.cached = cached
+        self.fido_control_point_path = control_point_path
+        self.fido_control_point_length_path = control_point_length_path
+        self.fido_status_path = status_path
 
     async def connect(self, handler):
         if self.max_msg_size == 0: # If we know Max Msg we have done this at least once. Don't want to redo it
@@ -53,15 +79,28 @@ class CTAPBLEDevice:
                 self.cached = True
                 await self.device.call_connect()
 
-            # Hardcode char ids or adaptive? char001f, char001c and char001a on service0019 always seem to reflect what we need, not sure why
-            control_point_length_proxy = bus.get_proxy_object('org.bluez', self.device_id + '/service0019/char001f', await bus.introspect('org.bluez', self.device_id + '/service0019/char001f'))
+            if self.fido_control_point_path is None or self.fido_control_point_length_path is None or self.fido_status_path is None:
+                characteristic_paths = {
+                    FIDO_CONTROL_POINT_UUID: None,
+                    FIDO_CONTROL_POINT_LENGTH_UUID: None,
+                    FIDO_STATUS_UUID: None,
+                }
+                await find_characteristics(self.device_id, None, characteristic_paths)
+                self.fido_control_point_path = characteristic_paths[FIDO_CONTROL_POINT_UUID]
+                self.fido_control_point_length_path=characteristic_paths[FIDO_CONTROL_POINT_LENGTH_UUID]
+                self.fido_status_path = characteristic_paths[FIDO_STATUS_UUID]
+
+            control_point_length_proxy = bus.get_proxy_object('org.bluez', self.fido_control_point_length_path,
+                                                              await bus.introspect('org.bluez', self.fido_control_point_length_path))
             control_point_length = control_point_length_proxy.get_interface('org.bluez.GattCharacteristic1')
 
-            status_proxy = bus.get_proxy_object('org.bluez', self.device_id + '/service0019/char001c', await bus.introspect('org.bluez', self.device_id + '/service0019/char001c'))
+            status_proxy = bus.get_proxy_object('org.bluez', self.fido_status_path,
+                                                await bus.introspect('org.bluez', self.fido_status_path))
             status_characteristic = status_proxy.get_interface('org.bluez.GattCharacteristic1')
             notify_properties = status_proxy.get_interface('org.freedesktop.DBus.Properties')
 
-            control_point_proxy = bus.get_proxy_object('org.bluez', self.device_id + '/service0019/char001a', await bus.introspect('org.bluez', self.device_id + '/service0019/char001a'))
+            control_point_proxy = bus.get_proxy_object('org.bluez',  self.fido_control_point_path,
+                                                       await bus.introspect('org.bluez',  self.fido_control_point_path))
             control_point = control_point_proxy.get_interface('org.bluez.GattCharacteristic1')
             # noinspection PyUnresolvedReferences
             self.max_msg_size = int.from_bytes(bytes(await control_point_length.call_read_value({})), "big")
