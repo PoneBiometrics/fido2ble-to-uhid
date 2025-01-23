@@ -75,15 +75,10 @@ async def start_system():
         # noinspection PyAsyncCall
         asyncio.create_task(hid.start())
         hid_devices.append(hid)
+    await asyncio.Event().wait()
 
 def main():
-    loop = asyncio.get_event_loop()
-    try:
-        loop.run_until_complete(start_system())
-        loop.run_forever()  # run queued dispatch tasks
-        loop.close()
-    except KeyboardInterrupt:
-        loop.close()
+    asyncio.run(start_system())
 
 if __name__ == "__main__":
     main()
