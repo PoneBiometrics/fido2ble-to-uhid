@@ -61,8 +61,11 @@ class CTAPBLEDevice:
         self.fido_control_point_path = control_point_path
         self.fido_control_point_length_path = control_point_length_path
         self.fido_status_path = status_path
+        self.has_connected = False
 
     async def connect(self, handler):
+        if self.has_connected == True:
+            return self
         if self.max_msg_size == 0: # If we know Max Msg we have done this at least once. Don't want to redo it
             self.handler = partial(notify_message, handler)
             bus: MessageBus = await MessageBus(bus_type=BusType.SYSTEM).connect()
@@ -115,6 +118,7 @@ class CTAPBLEDevice:
             logging.debug(f"Device already connected: {self.device_id}")
             await self.reconnect()
 
+        self.has_connected = True
         self.timeout = 5000  # Way higher than should be until we fix keep alive interval on card
         logging.debug(f"Connection complete: {self.device_id}")
         return self
@@ -122,10 +126,12 @@ class CTAPBLEDevice:
     async def reconnect(self):
         # noinspection PyUnresolvedReferences
         await self.device.call_connect()
-        self.connected = True
         await self.listen_to_notify()
 
     async def disconnect(self):
+        if self.has_connected == False:
+            return
+        self.has_connected = False
         # noinspection PyUnresolvedReferences
         logging.debug(f"Disconnecting: {self.device_id}")
         self.fido_status_notify_listen.off_properties_changed(self.handler)
@@ -136,7 +142,7 @@ class CTAPBLEDevice:
         self.connected = False
 
     async def write_data(self, payload):
-        while not self.connected:
+        while not self.has_connected:
             logging.debug("Waiting to connect")
             await asyncio.sleep(0.5)
 
@@ -168,8 +174,9 @@ class CTAPBLEDevice:
             seq += 1
 
     def get_connected_ble(self):
-        if self.connected:
+        if self.has_connected:
             return self
+
         return None
 
     def keep_alive(self):
