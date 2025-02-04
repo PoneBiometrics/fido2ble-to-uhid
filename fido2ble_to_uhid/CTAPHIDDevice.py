@@ -226,7 +226,6 @@ class CTAPHIDDevice:
             await connected_ble_device.send_ble_message(CTAPBLE_CMD.MSG, self.hid_buffer)
         elif self.hid_command == CTAPHID_CMD.CANCEL:
             await connected_ble_device.send_ble_message(CTAPBLE_CMD.CANCEL, self.hid_buffer)
-            await self.ble_device.disconnect()
             for task in self.active_tasks:
                 if not task.done():
                     await task.cancel()
