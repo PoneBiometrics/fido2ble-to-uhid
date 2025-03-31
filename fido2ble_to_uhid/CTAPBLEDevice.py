@@ -119,7 +119,7 @@ class CTAPBLEDevice:
             await self.reconnect()
 
         self.has_connected = True
-        self.timeout = 5000  # Way higher than should be until we fix keep alive interval on card
+        self.timeout = 3000
         logging.debug(f"Connection complete: {self.device_id}")
         return self
 
@@ -159,6 +159,7 @@ class CTAPBLEDevice:
         logging.debug(f"ble tx: command={command.name} device={self.device_id} payload={payload.hex()}")
         offset_start = 0
         seq = 0
+        self.keep_alive()
         while offset_start < len(payload) or offset_start == 0:
             if seq == 0:
                 capacity = self.max_msg_size - 3
@@ -180,4 +181,4 @@ class CTAPBLEDevice:
         return None
 
     def keep_alive(self):
-        self.timeout = 5000
+        self.timeout = 3000
