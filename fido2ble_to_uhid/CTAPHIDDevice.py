@@ -19,6 +19,7 @@ class CTAPHIDDevice:
     ble_device: CTAPBLEDevice
     channels_to_state: dict[int, bytes] = {}
     active_tasks: list = []
+    timeout_task = None
     active_channel: int
 
     hid_packet_size: int = 64
@@ -140,8 +141,10 @@ class CTAPHIDDevice:
             await self.send_init_reply(buffer, CTAPHID_BROADCAST_CHANNEL)
             logging.debug(f"Init complete for {self.ble_device.device_id}")
 
-            # noinspection PyAsyncCall
-            asyncio.create_task(self.check_timeout())
+            # Only create a new task if the previous one is completed
+            if not self.timeout_task or self.timeout_task.done():
+                self.timeout_task = asyncio.create_task(self.check_timeout())
+
             self.active_channel = new_channel
 
             self.channels_to_state[new_channel] = buffer
