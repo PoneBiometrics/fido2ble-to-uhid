@@ -5,7 +5,8 @@ After=bluetooth.target
 After=dev-uhid.device
 
 [Service]
-ExecStart=/usr/bin/fido2ble
+EnvironmentFile=-/etc/default/fido2ble
+ExecStart=/usr/bin/fido2ble $DAEMON_ARGS
 # OpenFile=/dev/uhid  # potentially to run this in a less powerful user
 # DynamicUser=yes
 # ProtectSystem=yes
