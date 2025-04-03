@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import argparse
 import asyncio
 import logging
 
@@ -17,12 +18,6 @@ FIDO_SERVICE_REVISION_BITFIELD_UUID = "f1d0fff4-deaa-ecee-b42f-c9ba7ed623bb"
 
 DEVICE_INTERFACE = "org.bluez.Device1"
 PROPERTIES_INTERFACE = "org.freedesktop.DBus.Properties"
-
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s.%(msecs)03d %(message)s",
-    datefmt='%I:%M:%S')
-logging.getLogger("UHIDDevice").setLevel(logging.ERROR)
 
 fido_devices: dict[str, CTAPBLEDevice]
 hid_devices:  dict[str, CTAPHIDDevice]
@@ -74,7 +69,6 @@ async def monitor_bluez():
         interfaces_added(path, interfaces, bus)))
     # noinspection PyUnresolvedReferences
     manager.on_interfaces_removed(interfaces_removed)
-
 
 async def create_device(device_path, dbus_managed_objects, bus) -> CTAPBLEDevice:
     device_proxy = bus.get_proxy_object('org.bluez', device_path, await bus.introspect('org.bluez', device_path))
@@ -145,6 +139,42 @@ async def start_system():
     await asyncio.Event().wait()
 
 def main():
+    parser = argparse.ArgumentParser(prog="fido2ble", description="connect with BLE FIDO2 devices")
+    parser.add_argument('-l', '--log-level', default="warn", help="log level of service, either debug, info, warn or error")
+    parser.add_argument('-u', '--uhid-log-level', default="error", help="log level of uhid device, either debug, info, warn or error")
+
+    args = parser.parse_args()
+
+    loglevel = logging.WARNING
+    if args.log_level == "debug":
+        loglevel = logging.DEBUG
+    elif args.log_level == "info":
+        loglevel = logging.INFO
+    elif args.log_level == "warn":
+        loglevel = logging.WARNING
+    elif args.log_level == "error":
+        loglevel = logging.ERROR
+    else:
+        print(f"unrecognized loglevel {args.log_level}")
+        exit(1)
+
+    uhid_loglevel = logging.ERROR
+    if args.uhid_log_level == "debug":
+        uhid_loglevel = logging.DEBUG
+    elif args.uhid_log_level == "info":
+        uhid_loglevel = logging.INFO
+    elif args.uhid_log_level == "warn":
+        uhid_loglevel = logging.WARNING
+    elif args.uhid_log_level == "error":
+        uhid_loglevel = logging.ERROR
+    else:
+        print(f"unrecognized loglevel {args.uhid_log_level}")
+        exit(1)
+    logging.basicConfig(
+        level=loglevel,
+        format="%(asctime)s.%(msecs)03d %(message)s",
+        datefmt='%I:%M:%S')
+    logging.getLogger("UHIDDevice").setLevel(uhid_loglevel)
     asyncio.run(start_system())
 
 if __name__ == "__main__":

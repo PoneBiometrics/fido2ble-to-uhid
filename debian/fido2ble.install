@@ -1,1 +1,2 @@
 debian/pone.sources /etc/apt/sources.list.d/
+debian/fido2ble.default /etc/default/fido2ble
