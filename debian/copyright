@@ -1,7 +1,7 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Source: https://github.com/PoneBiometrics/fido2ble-to-uhid/
-Upstream-Name: fido2ble-to-uhid
-Upstream-Contact: https://github.com/PoneBiometrics/fido2ble-to-uhid/issues/new
+Source: https://github.com/PoneBiometrics/fido2ble/
+Upstream-Name: fido2ble
+Upstream-Contact: https://github.com/PoneBiometrics/fido2ble/issues/new
 
 Files:
  *
@@ -52,7 +52,7 @@ Comment:
 
 
 Files:
- fido2ble_to_uhid/vendored/dbus_fast/*
+ fido2ble/vendored/dbus_fast/*
 Copyright:
  Copyright (c) 2022 Bluetooth Devices Authors
 License: MIT
@@ -76,7 +76,7 @@ License: MIT
  DEALINGS IN THE SOFTWARE.
 
 Files:
- fido2ble_to_uhid/vendored/uhid/*
+ fido2ble/vendored/uhid/*
 Copyright:
  2020 Filipe Laíns <filipe.lains@gmail.com>
 License: MIT

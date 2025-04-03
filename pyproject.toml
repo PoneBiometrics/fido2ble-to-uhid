@@ -3,13 +3,15 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fido2ble-to-uhid"
+name = "fido2ble"
 authors = [
   {name= "Jó Ágila Bitsch", email = "jo.bitsch@gmail.com"},
   {name= "Sigurhjörtur Snorrason", email = "sis@ponebiometrics.com"},
+  {name= "Magnus Ringerud", email = "mar@ponebiometrics.com>ponebiometrics.com"},
+  {name= "Kacper Wysocki", email = "kacper@delta9.pl"},
 ]
 version = "0.0.1"
 license = {text="MIT"}
 
 [project.scripts]
-fido2ble-to-uhid = "fido2ble_to_uhid.fido2ble_to_uhid:main"
+fido2ble = "fido2ble.fido2ble:main"
