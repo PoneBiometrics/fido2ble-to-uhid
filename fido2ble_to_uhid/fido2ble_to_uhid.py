@@ -15,7 +15,10 @@ FIDO_STATUS_UUID = "f1d0fff2-deaa-ecee-b42f-c9ba7ed623bb"
 FIDO_CONTROL_POINT_LENGTH_UUID = "f1d0fff3-deaa-ecee-b42f-c9ba7ed623bb"
 FIDO_SERVICE_REVISION_BITFIELD_UUID = "f1d0fff4-deaa-ecee-b42f-c9ba7ed623bb"
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s.%(msecs)03d %(message)s",
+    datefmt='%I:%M:%S')
 logging.getLogger("UHIDDevice").setLevel(logging.ERROR)
 
 async def create_device(device_path, dbus_managed_objects, bus) -> CTAPBLEDevice:
@@ -38,7 +41,7 @@ async def create_device(device_path, dbus_managed_objects, bus) -> CTAPBLEDevice
     control_point_path = characteristic_paths[FIDO_CONTROL_POINT_UUID]
     control_point_length_path = characteristic_paths[FIDO_CONTROL_POINT_LENGTH_UUID]
     status_path = characteristic_paths[FIDO_STATUS_UUID]
-    return CTAPBLEDevice(device1, device_path, cached, control_point_path, control_point_length_path, status_path)
+    return CTAPBLEDevice(device_proxy, device1, device_path, cached, control_point_path, control_point_length_path, status_path)
 
 
 async def find_fido() -> dict[str, CTAPBLEDevice]:
