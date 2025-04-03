@@ -1,9 +1,9 @@
-# fido2ble-to-uhid
+# fido2ble
 Bridging FIDO2 BLE devices to the HID bus via /dev/uhid so they can be used in browsers
 
 ## Installation
 
-The easiest way to install is by using the `.deb` from the [releases](https://github.com/PoneBiometrics/fido2ble-to-uhid/releases) page. This can the be installed through `apt install`. This will then add the release page to the repositores and it can then be updated through `apt update && apt upgrade`
+The easiest way to install is by using the `.deb` from the [releases](https://github.com/PoneBiometrics/fido2ble/releases) page. This can the be installed through `apt install`. This will then add the release page to the repositores and it can then be updated through `apt update && apt upgrade`
 
 The second option would be to running it manually from the reposistory as instructed below.
 
@@ -19,7 +19,7 @@ pip install uhid dbus-fast
 Run the following command in a new shell:
 
 ```
-fido2ble_to_uhid/fido2ble_to_uhid.py
+fido2ble/fido2ble.py
 ```
 The above needs some elevated privileges, either through running as root, sudo or by granting python the capabilities needed.
 
