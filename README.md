@@ -19,7 +19,7 @@ pip install uhid dbus-fast
 Run the following command in a new shell:
 
 ```
-fido2ble/fido2ble.py
+python3 -m fido2ble.fido2ble
 ```
 The above needs some elevated privileges, either through running as root, sudo or by granting python the capabilities needed.
 
@@ -103,12 +103,6 @@ bluetoothctl pair 12:34:56:78:9A:BC
 ```
 
 The OFFPAD will prompt for a pairing code and after that the OFFPAD is paired. We can then turn of the scan that we either sent to the background or have in a different tab. If we backgrounded it, running `fg` will bring it to the foreground before we terminate it with `CTRL+C`
-
-### Notes
-
-It currently only works, if the OFFPAD is previously paired. The code is also set to find OFFPADs as FIDO devices only. If any changes happen to pairings, either new pairing or a removal, the python application must be restarted to updates the UHID devices available.  
-
-
 
 ## Credit
 `/dev/uhid` handling took a lot of notes from https://github.com/BryanJacobs/fido2-hid-bridge but was rewritten significantly.
