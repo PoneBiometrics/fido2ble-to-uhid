@@ -40,7 +40,7 @@ async def interfaces_added(path, interfaces, bus):
         if 'UUIDs' in device1_interface:
             for uuid in device1_interface['UUIDs'].value:
                 if uuid == FIDO_SERVICE_UUID:
-                    logging.debug(f"Found {path} as new FIDO device")
+                    logging.info(f"Found new FIDO device: {path}")
                     # Get the specific device object
                     obj = bus.get_proxy_object('org.bluez', path, await bus.introspect('org.bluez', path))
                     props = obj.get_interface(PROPERTIES_INTERFACE)
@@ -54,7 +54,7 @@ async def interfaces_removed(path, interfaces):
             del fido_devices[path]
             hid_devices[path].device.destroy()
             del hid_devices[path]
-            logging.debug(f"Device Removed: {path}")
+            logging.info(f"Device Removed: {path}")
 
 
 async def monitor_bluez():
@@ -118,11 +118,11 @@ async def find_fido() -> dict[str, CTAPBLEDevice]:
                 if 'UUIDs' in dbus_managed_objects[device_path]['org.bluez.Device1']:
                     for uuid in dbus_managed_objects[device_path]['org.bluez.Device1']['UUIDs'].value:
                         if uuid == FIDO_SERVICE_UUID:
-                            logging.debug(f"Added {device_path} as FIDO device")
+                            logging.info(f"Added {device_path} as FIDO device")
                             fido_devices[device_path] = await create_device(device_path, dbus_managed_objects, bus)
                 elif 'ServiceData' in dbus_managed_objects[device_path]['org.bluez.Device1']:
                     if FIDO_SERVICE_UUID in dbus_managed_objects[device_path]['org.bluez.Device1']['ServiceData'].value.keys():
-                        logging.debug(f"Added {device_path} as FIDO device")
+                        logging.info(f"Added {device_path} as FIDO device")
                         fido_devices[device_path] = await create_device(device_path, dbus_managed_objects, bus)
     return fido_devices
 
