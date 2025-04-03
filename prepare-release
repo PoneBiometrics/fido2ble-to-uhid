@@ -8,9 +8,9 @@ VERSION="$(dpkg-parsechangelog -S Version)"
 rm -rf release-files
 mkdir -p release-files
 
-cp ../fido2ble-to-uhid_${VERSION}_all.deb release-files/
-cp ../fido2ble-to-uhid_${VERSION}.dsc release-files/
-cp ../fido2ble-to-uhid_${VERSION}.tar.xz release-files/
+cp ../fido2ble_${VERSION}_all.deb release-files/
+cp ../fido2ble_${VERSION}.dsc release-files/
+cp ../fido2ble_${VERSION}.tar.xz release-files/
 
 cd release-files
 dpkg-scanpackages . /dev/null > Packages

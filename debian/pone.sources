@@ -1,5 +1,5 @@
 Types: deb deb-src
-URIs: https://github.com/PoneBiometrics/fido2ble-to-uhid/releases/latest/download
+URIs: https://github.com/PoneBiometrics/fido2ble/releases/latest/download
 Suites: ./
 Signed-By: 
   -----BEGIN PGP PUBLIC KEY BLOCK-----

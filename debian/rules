@@ -4,7 +4,7 @@
 # Output every command that modifies files on the build system.
 #export DH_VERBOSE = 1
 
-export PYBUILD_NAME=fido2ble-to-uhid
+export PYBUILD_NAME=fido2ble
 export PYBUILD_OPTION=-p 3.8 -p 3.9 -p 3.10 -p 3.11 -p 3.12
 
 %:

@@ -14,7 +14,7 @@ this will later go to `/usr/share/keyrings/pone.pgp`
 
 ```
 mkdir -p release
-cp ../fido2ble-to-uhid_0.1_all.deb ../fido2ble-to-uhid_0.1.dsc ../fido2ble-to-uhid_0.1.tar.xz release/
+cp ../fido2ble_0.1_all.deb ../fido2ble_0.1.dsc ../fido2ble_0.1.tar.xz release/
 cd release
 
 # Generate the Packages file

@@ -1,4 +1,4 @@
-Source: fido2ble-to-uhid
+Source: fido2ble
 Section: misc
 Priority: optional
 Maintainer: Jó Ágila Bitsch <jo.bitsch@gmail.com>
@@ -10,26 +10,26 @@ Build-Depends:
 # python3-setuptools,
 #Testsuite: autopkgtest-pkg-python
 Standards-Version: 4.6.2
-Homepage: https://github.com/PoneBiometrics/fido2ble-to-uhid/
-Vcs-Browser: https://github.com/PoneBiometrics/fido2ble-to-uhid/
-Vcs-Git: https://github.com/PoneBiometrics/fido2ble-to-uhid.git
+Homepage: https://github.com/PoneBiometrics/fido2ble
+Vcs-Browser: https://github.com/PoneBiometrics/fido2ble
+Vcs-Git: https://github.com/PoneBiometrics/fido2ble.git
 
-Package: fido2ble-to-uhid
+Package: fido2ble
 Architecture: all
 Multi-Arch: foreign
 Depends:
  ${python3:Depends},
  ${misc:Depends},
 # Suggests:
-#  python-fido2ble-to-uhid-doc,
+#  python-fido2ble-doc,
 Description: Proxy FIDO2 BLE Devices to UHID so they can be used in
  browsers and stuff. Browsers and many other applications do not
  support BLE implemented FIDO2 tokens for now.
- fido2ble-to-uhid makes them available via UHID, so they also work in
+ fido2ble makes them available via UHID, so they also work in
  browsers and other FIDO2 enabled applications.
 
 
-# Package: python-fido2ble-to-uhid-doc
+# Package: python-fido2ble-doc
 # Section: doc
 # Architecture: all
 # Multi-Arch: foreign
