@@ -127,6 +127,7 @@ class CTAPBLEDevice:
             self.fido_control_point = control_point
             self.fido_status = status_characteristic
             self.fido_status_notify_listen = notify_properties
+            self.connected=True
             await self.listen_to_notify()
         else:
             logging.debug(f"Device previously connected: {self.device_id}")
@@ -222,3 +223,22 @@ class CTAPBLEDevice:
         # noinspection PyUnresolvedReferences
         self.device_properties_interface.on_properties_changed(self.properties_changed)
         self.properties_changed_listener_active = True
+
+    def remove_signal_handler(self):
+        """Detach the signal handler to stop listening for property changes."""
+        if not self.properties_changed_listener_active:
+            # If no handler is active, there's nothing to remove
+            return
+
+        if not self.device_properties_interface:
+            logging.warning(f"Device properties interface not initialized for {self.device_id}")
+            return
+
+        logging.debug(f"Removing properties changed signal handler for {self.device_id}")
+        # Assuming the handler can be removed via the same interface object
+        # The library might have an unsubscribe method or equivalent
+        self.device_properties_interface.off_properties_changed(self.properties_changed)
+
+        # Set the listener active flag to False
+        self.properties_changed_listener_active = False
+
