@@ -10,7 +10,7 @@ authors = [
   {name= "Magnus Ringerud", email = "mar@ponebiometrics.com"},
   {name= "Kacper Wysocki", email = "kacper@delta9.pl"},
 ]
-version = "0.0.1"
+version = "0.2"
 license = {text="MIT"}
 
 [project.scripts]
